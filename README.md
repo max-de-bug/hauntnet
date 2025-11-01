@@ -1,6 +1,6 @@
 # 🎃 HauntNet 👻
 
-![HauntNet](https://postimg.cc/Y4MLMKfN)
+![HauntNet](https://i.postimg.cc/bv2x0qZ5/Cursor-s-YRrrc5Lxe.png)
 
 > **A peer-to-peer haunted chatroom in Halloween style**
 
