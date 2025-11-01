@@ -1,5 +1,7 @@
 # 🎃 HauntNet 👻
 
+![HauntNet Demo](https://i.ibb.co/wFBq6HhL/Cursor-s-YRrrc5-Lxe.png)
+
 > **A peer-to-peer haunted chatroom in Halloween style**
 
 HauntNet is a spooky decentralized chatroom where ghosts and spirits whisper across the network. Built with Rust 🦀, featuring end-to-end encryption, automatic peer discovery, and a Halloween-themed interface.
