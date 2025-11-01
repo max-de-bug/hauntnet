@@ -4,8 +4,6 @@
 
 > **A peer-to-peer haunted chatroom in Halloween style**
 
-HauntNet is a spooky decentralized chatroom where ghosts and spirits whisper across the network. Built with Rust 🦀, featuring end-to-end encryption, automatic peer discovery, and a Halloween-themed interface.
-
 ## ✨ Features
 
 - 🔐 **End-to-End Encryption** - Private whispers encrypted with X25519 key exchange + ChaCha20-Poly1305
