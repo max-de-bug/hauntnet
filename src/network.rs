@@ -255,12 +255,8 @@ impl Network {
                             });
                         }
 
-                        // Suppress heartbeat display (not initial joins)
-                        if let MessageType::Heartbeat { .. } = &message.msg_type {
-                            continue;
-                        }
-
-                        // Suppress duplicate join announcements
+                        // Suppress duplicate join announcements (heartbeats)
+                        // Don't display repeated join/heartbeat messages, only new peers
                         if let MessageType::Join { .. } = &message.msg_type {
                             if !is_new_peer {
                                 continue;
@@ -287,22 +283,38 @@ impl Network {
                                                     to: to.clone(),
                                                     content: plaintext,
                                                 };
+                                                // Continue to display the decrypted message below
                                             }
                                             Err(e) => {
-                                                eprintln!("❌ Failed to decrypt message from {from}: {e}");
-                                                continue;
+                                                eprintln!("\n❌ Failed to decrypt whisper from {from}: {e}");
+                                                eprintln!("   💡 Tip: The peer may have restarted with new keys. Try asking them to send another message.");
+                                                // Replace with error message so user sees what happened
+                                                message.msg_type = MessageType::Whisper {
+                                                    from: from.clone(),
+                                                    to: to.clone(),
+                                                    content: format!("[DECRYPTION FAILED: {}]", e),
+                                                };
+                                                // Continue to display below
                                             }
                                         }
                                     } else {
-                                        eprintln!("❌ No public key for sender {from}");
-                                        continue;
+                                        eprintln!("\n⚠️  Received encrypted whisper from {from} but no public key available.");
+                                        eprintln!("   💡 Tip: Wait for the peer to send a join message or ask them to reconnect.");
+                                        // Show that we received something but couldn't decrypt
+                                        message.msg_type = MessageType::Whisper {
+                                            from: from.clone(),
+                                            to: to.clone(),
+                                            content: "[Unable to decrypt - missing public key]".to_string(),
+                                        };
+                                        // Continue to display
                                     }
                                 } else {
-                                    eprintln!("❌ Unknown sender {from}");
+                                    eprintln!("\n⚠️  Received encrypted whisper from unknown sender: {from}");
+                                    // Not in peer list, can't decrypt - skip
                                     continue;
                                 }
                             } else {
-                                // Not for us, ignore
+                                // Encrypted whisper not addressed to us, ignore
                                 continue;
                             }
                         }
@@ -354,17 +366,20 @@ impl Network {
         socket: Arc<UdpSocket>,
         peers: Arc<RwLock<HashMap<String, PeerInfo>>>,
         ghost_name: String,
-        _public_key: PublicKey,
-        _receive_port: u16,
+        public_key: PublicKey,
+        receive_port: u16,
     ) {
         let mut interval = time::interval(HEARTBEAT_INTERVAL);
 
         loop {
             interval.tick().await;
 
-            // Send heartbeat (simple heartbeat, not a full Join)
-            let message = Message::new(MessageType::Heartbeat {
-                from: ghost_name.clone(),
+            // Send heartbeat as Join message (includes receive_port and public_key)
+            // This ensures peers always have correct addresses and public keys
+            let message = Message::new(MessageType::Join {
+                ghost_name: ghost_name.clone(),
+                public_key: Some(PublicKeyBytes(public_key.to_bytes())),
+                receive_port: Some(receive_port),
             });
 
             if let Ok(bytes) = message.to_bytes() {
