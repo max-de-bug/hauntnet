@@ -3,6 +3,7 @@ mod cli;
 mod message;
 mod network;
 
-fn main() {
-    cli::start_cli();
+#[tokio::main]
+async fn main() {
+    cli::start_cli().await;
 }

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::time::SystemTime;
 use tokio::sync::mpsc;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use colored::*;
 
 /// Public key wrapper for x25519 keys (32 bytes)
@@ -40,6 +41,7 @@ pub enum MessageType {
     Join {
         ghost_name: String,
         public_key: Option<PublicKeyBytes>,
+        receive_port: Option<u16>, // Unique port where this peer receives messages
     },
     /// Request list of online peers
     ListRequest {
@@ -108,20 +110,31 @@ pub async fn start_interactive_loop(
     spooky_name: String,
     command_tx: mpsc::UnboundedSender<Command>,
 ) {
-    println!("\nType 'help' to see available commands");
+    println!("\n✅ You're now online! Type 'help' to see available commands");
     
-    let mut input = String::new();
+    // Use async stdin to avoid blocking the tokio runtime
+    let stdin = tokio::io::stdin();
+    let mut reader = BufReader::new(stdin).lines();
+    
     loop {
         print!("👻> ");
         io::stdout().flush().unwrap();
         
-        input.clear();
-        if io::stdin().read_line(&mut input).is_err() {
-            eprintln!("Failed to read input.");
-            continue;
-        }
+        // Async read line - won't block other tasks
+        let input_line = match reader.next_line().await {
+            Ok(Some(line)) => line,
+            Ok(None) => {
+                // EOF reached, exit gracefully
+                let _ = command_tx.send(Command::Leave);
+                break;
+            }
+            Err(e) => {
+                eprintln!("❌ Failed to read input: {e}");
+                continue;
+            }
+        };
         
-        let input = input.trim();
+        let input = input_line.trim();
         let mut parts = input.split_whitespace();
         let command = match parts.next() {
             Some(cmd) => cmd.to_lowercase(),
@@ -173,7 +186,7 @@ pub async fn start_interactive_loop(
             "help" => print_help(),
             "exit" => {
                 let _ = command_tx.send(Command::Leave);
-                println!("👋 Farewell, {}! Until next haunting...", spooky_name);
+                println!("👋 Farewell, {spooky_name}! Until next haunting...");
                 break;
             }
             _ => println!("💀 Unknown command. Type 'help' for available commands."),
@@ -185,9 +198,9 @@ pub async fn start_interactive_loop(
 /// Prints the help message with available commands
 fn print_help() {
     println!("\n🎃 Available commands:");
-    println!("  {} - Join the haunted network", "join".bright_cyan());
+    println!("  {} - Re-announce presence (auto-joined on start)", "join".bright_cyan());
     println!("  {} - Broadcast message to all ghosts", "say <message>".bright_cyan());
-    println!("  {} - Send private message", "whisper <ghost> <message>".bright_cyan());
+    println!("  {} - Send encrypted private message", "whisper <ghost> <message>".bright_cyan());
     println!("  {} - List online ghosts", "list".bright_cyan());
     println!("  {} - Leave the chat", "vanish".bright_cyan());
     println!("  {} - Show this help", "help".bright_cyan());
